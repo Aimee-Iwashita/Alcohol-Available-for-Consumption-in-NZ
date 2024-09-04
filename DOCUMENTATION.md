@@ -156,3 +156,117 @@ We already know that the d = 0 and D = 1.
 Therefore the two candidate models are ARIMA(0,0,0)(1,1,0)<sub>4</sub> and ARIMA(0,0,0)(0,1,1)<sub>4</sub>.
 
 ### Model fitting 
+We will fit the two candidate models as well as the automatic full reserach model.
+
+```
+alc.fit <- alc.train %>%
+  model(arima000110 = ARIMA(box_cox(Alcohol, lambda) ~ pdq(0,0,0) + PDQ(1,1,0)),
+        arima000011 = ARIMA(box_cox(Alcohol, lambda) ~ pdq(0,0,0) + PDQ(0,1,1)),
+        auto = ARIMA(box_cox(Alcohol, lambda), stepwise = FALSE))
+
+alc.fit %>%
+  pivot_longer(everything(), names_to = "Model_name", values_to = "Orders")
+```
+<img src="https://github.com/Aimee-Iwashita/Alcohol-Available-for-Consumption-in-NZ/blob/main/images/models.png" alt="fitted models">
+
+```
+# Compare the models using AICc
+glance(alc.fit) %>%
+  arrange(AICc) %>%
+  select(.model:BIC)
+```
+<img src="https://github.com/Aimee-Iwashita/Alcohol-Available-for-Consumption-in-NZ/blob/main/images/model_comparison.png" alt="model comparison">
+
+Since we have the same differencing orders for all 3 candidate models, we can compare these models using the AICc. The automatic full search model has the smallest AICc value and therefore we will choose this model as the best model. The automatic full search model is ARIMA(1,0,1)(1,1,0)<sub>4</sub>
+
+```
+# Report the chosen model's parameter estimates
+alc.fit %>%
+  select(auto) %>%
+  report()
+```
+<img src="https://github.com/Aimee-Iwashita/Alcohol-Available-for-Consumption-in-NZ/blob/main/images/automatic_full_research_model.png" alt="model report">
+
+### Diagnostic check
+
+```
+alc.fit %>%
+  select(auto) %>%
+  gg_tsresiduals()
+```
+<img src="https://github.com/Aimee-Iwashita/Alcohol-Available-for-Consumption-in-NZ/blob/main/images/Plot4.png" alt="residual diagnostic check">
+
+```
+# Perform Ljung-Box test
+augment(alc.fit) %>%
+  filter(.model == "auto") %>%
+  features(.innov, ljung_box, lag = 8, dof = 3)
+```
+<img src="https://github.com/Aimee-Iwashita/Alcohol-Available-for-Consumption-in-NZ/blob/main/images/Ljung-Box_test.png" alt="Ljung-Box test">
+
+The assumptions of the ARIMA models are the normality of innovation residuals, the constant variance of innovation residuals, and the independence of the innovation residuals.
+
+The histogram shows that our innovation residuals are roughly normal and therefore satisfies the normality assumption.
+
+The time plot of the innovation residuals appears to have mean zero and reasonably constant variance indicating that the constant variance assumption is met.
+
+The ACF plot does not have any significant spike. We also performed a Ljung-Box test. The null hypothesis of the Ljung-Box test is that our innovation residuals are consistent with iid white noise, in another word, our innovation residuals are independent and does not have any autocorrelation. The test returned an insignificant p-value, hence we have no evidence against the null hypothesis. We accept the null hypothesis that our innovation residuals are independent and does not have any autocorrelation and therefore the independence assumption is satisfied.
+
+Therefore we have satisfied all the assumptions of the ARIMA model.
+
+### Forecasting 
+
+```
+# Forecast h = 13 quarters ahead
+alc.fc <- alc.fit %>%
+  forecast(h = 13)
+
+# Plot the point-forecasts with the full data set
+alc.df %>%
+  ggplot(mapping = aes(x = Quarter, y = Alcohol)) +
+  geom_line() +
+  geom_line(data = alc.fc, aes(y = .mean, colour = .model)) +
+  labs(title = "Point forecasts of 3 models against the full data set")
+```
+<img src="https://github.com/Aimee-Iwashita/Alcohol-Available-for-Consumption-in-NZ/blob/main/images/Plot5.png" alt="point forecast vs full data set">
+
+```
+# Compute test set accuracy
+accuracy(alc.fc, alc.df) %>%
+  select(.model, MASE)
+```
+<img src="https://github.com/Aimee-Iwashita/Alcohol-Available-for-Consumption-in-NZ/blob/main/images/MASE.png" alt="MASE">
+
+The automatic full research model,  ARIMA(1,0,1)(1,1,0)<sub>4</sub>, has the lowest MASE and therefore has the best forecasts.
+
+### ETS model
+
+```
+# Fit automatic ETS model on the training set
+alc.ets <- alc.train %>%
+  model(ETS(Alcohol))
+
+report(alc.ets)
+```
+<img src="https://github.com/Aimee-Iwashita/Alcohol-Available-for-Consumption-in-NZ/blob/main/images/ETS_model.png" alt="ETS model report">
+
+```
+# Forecast h = 13 quarters ahead
+alc.ets.fc <- alc.ets %>%
+  forecast(h = 13)
+
+# Compute test set accuracy of ETS model
+accuracy(alc.ets.fc, alc.df) %>%
+  select(.model, MASE)
+```
+<img src="https://github.com/Aimee-Iwashita/Alcohol-Available-for-Consumption-in-NZ/blob/main/images/ETS_MASE.png" alt="ETS model MASE">
+
+```
+# Compute test set accuracy of ARIMA model
+accuracy(alc.fc, alc.df) %>%
+  select(.model, MASE) %>%
+  filter(.model == "auto")
+```
+<img src="https://github.com/Aimee-Iwashita/Alcohol-Available-for-Consumption-in-NZ/blob/main/images/ARIMA_MASE.png" alt="ARIMA model MASE">
+
+The automatic ARIMA model has a smaller MASE and therefore has better forecasts over the three year test set compared to the automatic ETS model.
