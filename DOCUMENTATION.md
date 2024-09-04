@@ -1,4 +1,4 @@
-# Detailed Documentation of Alcohol available for consumption in Aotearoa Analysis
+# Detailed Documentation of Alcohol available for consumption in NZ Analysis
 
 The following packages are used for this analysis:
 ```
@@ -149,10 +149,10 @@ Both the ACF and PACF plots show no significant spikes before lag 4 which is the
 
 In the ACF plot, there is only one significant spike at lag 4 indicating that the seasonal part of MA has order 1. Therefore Q = 1 for one of the candidate model.
 
-### Model fitting 
-
 In the PACF plot, there is only one significant spike at lag 4 indicating that the seasonal part of AR has order 1. Therefore P = 1 for one of the candidate model.
 
 We already know that the d = 0 and D = 1.
 
 Therefore the two candidate models are ARIMA(0,0,0)(1,1,0)<sub>4</sub> and ARIMA(0,0,0)(0,1,1)<sub>4</sub>.
+
+### Model fitting 
